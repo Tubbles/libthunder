@@ -1,6 +1,6 @@
 # WI-0005: Game asset acquisition for testing
 
-Status: backlog
+Status: done
 
 ## Goal
 
@@ -24,3 +24,4 @@ Run the steps on this machine; the expected MPQ files exist and match recorded h
 ## Log
 
 - 2026-08-01: created from kickoff answer ("look at open-realm make download").
+- 2026-08-01: done. scripts/download-game-data.sh mirrors open-realm's target (archive.org, Warcraft-III-1.29.2-enUS.zip) and also accepts an existing install path. Download ran clean; data/Warcraft III/ now holds War3.mpq, War3x.mpq, War3Local.mpq, War3xLocal.mpq, Deprecated.mpq, stock melee maps, a demo campaign, and World Editor.exe (relevant to testing-strategy layer 2). Hashes recorded in docs/asset-manifest.md.
