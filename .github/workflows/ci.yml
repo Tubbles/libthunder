@@ -1,0 +1,16 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install pinned Odin toolchain
+        run: scripts/setup-toolchain.sh
+      - name: Build and test
+        run: scripts/check.sh
