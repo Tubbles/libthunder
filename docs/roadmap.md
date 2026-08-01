@@ -16,7 +16,7 @@ Deterministic simulation: consistent numerics and RNG, game data model, orders/c
 
 ## Phase 3: presentation
 
-Rendering (terrain, models, UI), audio, input. Backend per the pending rendering decision record (fed by docs/research/odin-ecosystem.md).
+Rendering (terrain, models, UI), audio, input. Backend per decision 0005: SDL3 for windowing/input/audio, OpenGL first behind a backend-agnostic renderer interface, vendor:wgpu as the later portability target.
 
 ## Phase 4: editor parity
 
