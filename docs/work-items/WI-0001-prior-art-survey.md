@@ -1,6 +1,6 @@
 # WI-0001: Prior art survey
 
-Status: in progress (research agent running since 2026-08-01)
+Status: done
 
 ## Goal
 
@@ -19,3 +19,5 @@ Grounding review pass per process.md: license claims spot-checked against upstre
 ## Log
 
 - 2026-08-01: created; research agent dispatched.
+- 2026-08-01: report landed in docs/research/prior-art.md (21+ projects, all licenses verified by the agent against LICENSE files).
+- 2026-08-01: grounding review passed. Independently re-verified via `gh api`: WarsmashModEngine AGPL-3.0, War3Net MIT, HiveWE AGPL-3.0, pjass BSD-2-Clause. Key findings: the WC3 full-engine field is nearly empty (open-realm, WarSmash, War3Net only); open-realm is MIT with a full JASS VM and in-tree MPQ reader; OpenMW/OpenSAGE are the clean-room methodology precedents to cite, devilutionX (IDA-derived lineage) the pattern to avoid.
