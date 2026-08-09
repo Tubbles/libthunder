@@ -30,10 +30,6 @@ parse_version_chunk :: proc(reader: ^Reader, model: ^Model) -> Error {
 
 @(private)
 parse_model_chunk :: proc(reader: ^Reader, model: ^Model, allocator: runtime.Allocator) -> Error {
-	delete(model.name, allocator)
-	delete(model.animation_file_name, allocator)
-	model.name = ""
-	model.animation_file_name = ""
 	model.name = read_fixed_string(reader, 80, allocator) or_return
 	model.animation_file_name = read_fixed_string(reader, 260, allocator) or_return
 	if !read_extent(reader, &model.extent) || !read_value(reader, &model.blend_time) {
@@ -120,7 +116,7 @@ parse_material :: proc(reader: ^Reader, material: ^Material, allocator: runtime.
 			return .Corrupt_Chunk
 		}
 		layer_count, count_ok := read_u32(&sub)
-		if !count_ok || int(layer_count) * LAYER_MINIMUM_SIZE > reader_remaining(&sub) {
+		if !count_ok || i64(layer_count) * LAYER_MINIMUM_SIZE > i64(reader_remaining(&sub)) {
 			return .Corrupt_Chunk
 		}
 		material.layers = make([]Layer, int(layer_count), allocator)
@@ -192,7 +188,7 @@ parse_geoset :: proc(reader: ^Reader, geoset: ^Geoset, allocator: runtime.Alloca
 		return .Corrupt_Chunk
 	}
 	sequence_extent_count, extent_count_ok := read_u32(&sub)
-	if !extent_count_ok || int(sequence_extent_count) * SEQUENCE_EXTENT_SIZE > reader_remaining(&sub) {
+	if !extent_count_ok || i64(sequence_extent_count) * SEQUENCE_EXTENT_SIZE > i64(reader_remaining(&sub)) {
 		return .Corrupt_Chunk
 	}
 	// Magos lists the per-sequence extents as minimum plus maximum (24
@@ -212,7 +208,7 @@ parse_geoset :: proc(reader: ^Reader, geoset: ^Geoset, allocator: runtime.Alloca
 	// many UVBS sub-chunks follow (1 to 3 in the corpus). Each set
 	// costs at least the 8-byte UVBS header.
 	set_count, set_count_ok := read_u32(&sub)
-	if !set_count_ok || int(set_count) * 8 > reader_remaining(&sub) {
+	if !set_count_ok || i64(set_count) * 8 > i64(reader_remaining(&sub)) {
 		return .Corrupt_Chunk
 	}
 	geoset.texture_coordinate_sets = make([][][2]f32, int(set_count), allocator)

@@ -468,6 +468,168 @@ duplicate_chunk_fails :: proc(t: ^testing.T) {
 }
 
 @(test)
+empty_then_repeated_chunk_fails :: proc(t: ^testing.T) {
+	// Regression: repeat detection used to key on the first chunk's
+	// parsed data being non-nil, so an empty first chunk let a repeat
+	// through. The typed-tag rule must hold regardless of content.
+	file := make([dynamic]u8)
+	defer delete(file)
+	append(&file, "MDLX")
+	test_append_chunk(&file, "PIVT", {})
+	pivot_content := make([dynamic]u8)
+	defer delete(pivot_content)
+	test_append_f32_values(&pivot_content, {0.5, 1.5, 2.5})
+	test_append_chunk(&file, "PIVT", pivot_content[:])
+
+	_, error := parse(file[:])
+	testing.expect_value(t, error, Error.Corrupt_Chunk)
+}
+
+@(test)
+unknown_chunk_repeats_are_tolerated :: proc(t: ^testing.T) {
+	// Skipping an unknown chunk is free of side effects, so repeats of
+	// unknown tags stay tolerated; only typed tags are single-use.
+	file := make([dynamic]u8)
+	defer delete(file)
+	append(&file, "MDLX")
+	version_content := make([dynamic]u8)
+	defer delete(version_content)
+	test_append_u32(&version_content, 800)
+	test_append_chunk(&file, "VERS", version_content[:])
+	unknown_content := make([dynamic]u8)
+	defer delete(unknown_content)
+	append(&unknown_content, 1, 2, 3)
+	test_append_chunk(&file, "XXXX", unknown_content[:])
+	test_append_chunk(&file, "XXXX", unknown_content[:])
+
+	model, error := parse(file[:])
+	defer destroy(&model)
+	testing.expect_value(t, error, Error.None)
+	testing.expect_value(t, model.version, 800)
+}
+
+@(test)
+track_interpolation_above_bezier_fails :: proc(t: ^testing.T) {
+	file := make([dynamic]u8)
+	defer delete(file)
+	append(&file, "MDLX")
+	layer_body := make([dynamic]u8)
+	defer delete(layer_body)
+	test_append_u32(&layer_body, 0)
+	test_append_u32(&layer_body, 0)
+	test_append_u32(&layer_body, 0)
+	test_append_u32(&layer_body, NO_ID)
+	test_append_u32(&layer_body, 0)
+	test_append_f32(&layer_body, 1)
+	append(&layer_body, "KMTA")
+	test_append_u32(&layer_body, 0) // key count
+	test_append_u32(&layer_body, 4) // no such interpolation type
+	test_append_u32(&layer_body, NO_ID)
+	material_body := make([dynamic]u8)
+	defer delete(material_body)
+	test_append_u32(&material_body, 0)
+	test_append_u32(&material_body, 0)
+	append(&material_body, "LAYS")
+	test_append_u32(&material_body, 1)
+	test_append_sized_item(&material_body, layer_body[:])
+	material_content := make([dynamic]u8)
+	defer delete(material_content)
+	test_append_sized_item(&material_content, material_body[:])
+	test_append_chunk(&file, "MTLS", material_content[:])
+
+	_, error := parse(file[:])
+	testing.expect_value(t, error, Error.Corrupt_Chunk)
+}
+
+@(test)
+unknown_layer_sub_tag_fails :: proc(t: ^testing.T) {
+	file := make([dynamic]u8)
+	defer delete(file)
+	append(&file, "MDLX")
+	layer_body := make([dynamic]u8)
+	defer delete(layer_body)
+	test_append_u32(&layer_body, 0)
+	test_append_u32(&layer_body, 0)
+	test_append_u32(&layer_body, 0)
+	test_append_u32(&layer_body, NO_ID)
+	test_append_u32(&layer_body, 0)
+	test_append_f32(&layer_body, 1)
+	append(&layer_body, "ZZZZ")
+	test_append_u32(&layer_body, 0)
+	material_body := make([dynamic]u8)
+	defer delete(material_body)
+	test_append_u32(&material_body, 0)
+	test_append_u32(&material_body, 0)
+	append(&material_body, "LAYS")
+	test_append_u32(&material_body, 1)
+	test_append_sized_item(&material_body, layer_body[:])
+	material_content := make([dynamic]u8)
+	defer delete(material_content)
+	test_append_sized_item(&material_content, material_body[:])
+	test_append_chunk(&file, "MTLS", material_content[:])
+
+	_, error := parse(file[:])
+	testing.expect_value(t, error, Error.Corrupt_Chunk)
+}
+
+@(test)
+duplicated_node_track_keeps_last :: proc(t: ^testing.T) {
+	// A duplicated track tag within one node does not occur in the
+	// corpus; the parser keeps the last set and frees the earlier one.
+	// The runner's memory tracking pins the leak-freeness.
+	file := make([dynamic]u8)
+	defer delete(file)
+	append(&file, "MDLX")
+	node_body := make([dynamic]u8)
+	defer delete(node_body)
+	test_append_fixed_string(&node_body, "Root", 80)
+	test_append_u32(&node_body, 0)
+	test_append_u32(&node_body, NO_ID)
+	test_append_u32(&node_body, 0x100)
+	append(&node_body, "KGTR")
+	test_append_u32(&node_body, 1)
+	test_append_u32(&node_body, 1) // linear
+	test_append_u32(&node_body, NO_ID)
+	test_append_u32(&node_body, 0)
+	test_append_f32_values(&node_body, {1, 1, 1})
+	append(&node_body, "KGTR")
+	test_append_u32(&node_body, 1)
+	test_append_u32(&node_body, 1) // linear
+	test_append_u32(&node_body, NO_ID)
+	test_append_u32(&node_body, 500)
+	test_append_f32_values(&node_body, {9, 9, 9})
+	bone_content := make([dynamic]u8)
+	defer delete(bone_content)
+	test_append_sized_item(&bone_content, node_body[:])
+	test_append_u32(&bone_content, 0)
+	test_append_u32(&bone_content, NO_ID)
+	test_append_chunk(&file, "BONE", bone_content[:])
+
+	model, error := parse(file[:])
+	defer destroy(&model)
+	testing.expect_value(t, error, Error.None)
+	testing.expect_value(t, len(model.bones), 1)
+	testing.expect_value(t, len(model.bones[0].node.translation.keys), 1)
+	testing.expect_value(t, model.bones[0].node.translation.keys[0].time, 500)
+	testing.expect_value(t, model.bones[0].node.translation.keys[0].value, [3]f32{9, 9, 9})
+}
+
+@(test)
+node_size_below_minimum_fails :: proc(t: ^testing.T) {
+	file := make([dynamic]u8)
+	defer delete(file)
+	append(&file, "MDLX")
+	bone_content := make([dynamic]u8)
+	defer delete(bone_content)
+	test_append_u32(&bone_content, 10) // below the 96-byte node minimum
+	test_append_fixed_string(&bone_content, "Broken", 80)
+	test_append_chunk(&file, "BONE", bone_content[:])
+
+	_, error := parse(file[:])
+	testing.expect_value(t, error, Error.Corrupt_Chunk)
+}
+
+@(test)
 collision_shape_unknown_type_fails :: proc(t: ^testing.T) {
 	file := make([dynamic]u8)
 	defer delete(file)

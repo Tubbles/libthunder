@@ -73,16 +73,31 @@ parse_chunks :: proc(data: []u8, model: ^Model, allocator: runtime.Allocator) ->
 		data   = data,
 		offset = 4,
 	}
+	seen_tags := make(map[[4]u8]bool, allocator)
+	defer delete(seen_tags)
 	for reader_remaining(&reader) > 0 {
 		tag, tag_ok := read_tag(&reader)
 		chunk_size, size_ok := read_u32(&reader)
-		if !tag_ok || !size_ok || int(chunk_size) > reader_remaining(&reader) {
+		if !tag_ok || !size_ok || i64(chunk_size) > i64(reader_remaining(&reader)) {
 			return .Corrupt_Chunk
 		}
 		chunk_end := reader.offset + int(chunk_size)
 		chunk_reader := Reader {
 			data   = data[:chunk_end],
 			offset = reader.offset,
+		}
+		switch string(tag[:]) {
+		case "VERS", "MODL", "SEQS", "GLBS", "TEXS", "TXAN", "MTLS", "GEOS", "GEOA",
+		     "BONE", "LITE", "HELP", "ATCH", "PIVT", "PREM", "PRE2", "RIBB", "EVTS",
+		     "CAMS", "CLID":
+			// No corpus file repeats a typed top-level chunk; a repeat
+			// would clobber or duplicate earlier data, so it is corrupt.
+			// Unknown tags stay repeatable since skipping is free of
+			// side effects.
+			if tag in seen_tags {
+				return .Corrupt_Chunk
+			}
+			seen_tags[tag] = true
 		}
 		switch string(tag[:]) {
 		case "VERS":
@@ -145,11 +160,6 @@ parse_item_list :: proc(
 	parse_item: proc(reader: ^Reader, item: ^Item, allocator: runtime.Allocator) -> Error,
 	allocator: runtime.Allocator,
 ) -> Error {
-	if list^ != nil {
-		// No corpus file repeats a top-level chunk tag; a repeat would
-		// clobber the earlier chunk's data, so it is treated as corrupt.
-		return .Corrupt_Chunk
-	}
 	items := make([dynamic]Item, allocator)
 	error := Error.None
 	for reader_remaining(reader) > 0 && error == .None {

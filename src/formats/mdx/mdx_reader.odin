@@ -4,6 +4,10 @@ package mdx
 // sized items, node track regions) parse through a sub-reader whose data
 // slice is truncated to the region end, so every read inside a region is
 // automatically bounded by it.
+//
+// Validation arithmetic on file-supplied counts and sizes is done in
+// i64 so that a 32-bit int target (the wasm port is a standing project
+// constraint) cannot wrap a product or sum into a passing check.
 
 import "base:runtime"
 import "core:strings"
@@ -121,7 +125,7 @@ read_fixed_string :: proc(reader: ^Reader, length: int, allocator: runtime.Alloc
 // allocation so malformed counts cannot trigger huge allocations.
 @(private)
 read_array :: proc(reader: ^Reader, count: u32, list: ^[]$Element, allocator: runtime.Allocator) -> Error {
-	if int(count) * size_of(Element) > reader_remaining(reader) {
+	if i64(count) * size_of(Element) > i64(reader_remaining(reader)) {
 		return .Corrupt_Chunk
 	}
 	list^ = make([]Element, int(count), allocator)
@@ -157,10 +161,11 @@ begin_sized_item :: proc(reader: ^Reader, minimum_size: u32) -> (sub: Reader, it
 	if !size_ok || inclusive_size < minimum_size {
 		return {}, 0, false
 	}
-	item_end = item_start + int(inclusive_size)
-	if item_end > len(reader.data) {
+	item_end_wide := i64(item_start) + i64(inclusive_size)
+	if item_end_wide > i64(len(reader.data)) {
 		return {}, 0, false
 	}
+	item_end = int(item_end_wide)
 	sub = Reader {
 		data   = reader.data[:item_end],
 		offset = reader.offset,

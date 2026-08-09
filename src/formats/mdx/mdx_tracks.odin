@@ -24,7 +24,7 @@ parse_track_set :: proc(reader: ^Reader, track_set: ^Track_Set($Value), allocato
 	}
 	has_tangents := interpolation_raw >= u32(Interpolation_Type.Hermite)
 	bytes_per_key := 4 + size_of(Value) * (3 if has_tangents else 1)
-	if int(key_count) * bytes_per_key > reader_remaining(reader) {
+	if i64(key_count) * i64(bytes_per_key) > i64(reader_remaining(reader)) {
 		return .Corrupt_Chunk
 	}
 	// A duplicated track tag within one object does not occur in the
