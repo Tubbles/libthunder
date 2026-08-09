@@ -3,6 +3,7 @@ package mpq
 import "core:mem"
 import "core:os"
 import "core:path/filepath"
+import "core:strings"
 import "core:testing"
 
 // Hand-built archives exercise the full read path hermetically (no
@@ -218,6 +219,61 @@ header_is_found_behind_aligned_prefix :: proc(t: ^testing.T) {
 	defer delete(plain)
 	testing.expect_value(t, plain_error, Error.None)
 	testing.expect_value(t, string(plain), PLAIN_CONTENT)
+}
+
+// Two-sector zlib-compressed file (sector size 4096 at the builder's
+// shift of 3): a full first sector and a partial final one, covering
+// the sector offset table path hermetically instead of only through
+// corpus archives. Streams generated with Python zlib level 9 from
+// "0123456789ABCDEF" * 256 and "abcdefghijklmnop" * 94.
+@(test)
+synthetic_sectored_compressed_file_reads :: proc(t: ^testing.T) {
+	sector_a_compressed := [?]u8 {
+		0x78, 0xDA, 0xED, 0xC7, 0xCB, 0x15, 0xC0, 0x10, 0x00, 0x00, 0xB0, 0x95, 0x94, 0xFA, 0x1D, 0x51,
+		0xF6, 0x1F, 0xA9, 0x7B, 0x78, 0xC9, 0x2D, 0xE1, 0x89, 0xE9, 0xCD, 0xA5, 0xB6, 0x3E, 0xE6, 0xFA,
+		0xF6, 0x09, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0x7E, 0xDD, 0x7F, 0x6E, 0xFF, 0xA2, 0x2E,
+	}
+	sector_b_compressed := [?]u8 {
+		0x78, 0xDA, 0x4B, 0x4C, 0x4A, 0x4E, 0x49, 0x4D, 0x4B, 0xCF, 0xC8, 0xCC, 0xCA, 0xCE, 0xC9, 0xCD,
+		0xCB, 0x2F, 0x48, 0x1C, 0xE5, 0x8F, 0xF2, 0x47, 0xF9, 0xA3, 0xFC, 0x51, 0xFE, 0xB0, 0xE0, 0x03,
+		0x00, 0x96, 0xB4, 0x66, 0x0F,
+	}
+
+	stored := make([dynamic]u8)
+	defer delete(stored)
+	offset_count :: 3
+	sector_a_start := u32(offset_count * 4)
+	sector_a_size := u32(1 + len(sector_a_compressed))
+	sector_b_size := u32(1 + len(sector_b_compressed))
+	append_u32_little_endian(&stored, sector_a_start)
+	append_u32_little_endian(&stored, sector_a_start + sector_a_size)
+	append_u32_little_endian(&stored, sector_a_start + sector_a_size + sector_b_size)
+	append(&stored, COMPRESSION_ZLIB)
+	append(&stored, ..sector_a_compressed[:])
+	append(&stored, COMPRESSION_ZLIB)
+	append(&stored, ..sector_b_compressed[:])
+
+	uncompressed_size :: 4096 + 1504
+	files := [?]Synthetic_File {
+		{"sectored.bin", stored[:], uncompressed_size, BLOCK_FLAG_EXISTS | BLOCK_FLAG_COMPRESSED},
+	}
+	archive := write_and_open(t, "synthetic_sectored.mpq", 0, files[:])
+	if archive == nil {
+		return
+	}
+	defer close(archive)
+
+	data, read_error := read_file(archive, "sectored.bin")
+	defer delete(data)
+	testing.expect_value(t, read_error, Error.None)
+	testing.expect_value(t, len(data), uncompressed_size)
+
+	expected_first_sector := strings.repeat("0123456789ABCDEF", 256)
+	defer delete(expected_first_sector)
+	expected_final_sector := strings.repeat("abcdefghijklmnop", 94)
+	defer delete(expected_final_sector)
+	testing.expect_value(t, string(data[:4096]), expected_first_sector)
+	testing.expect_value(t, string(data[4096:]), expected_final_sector)
 }
 
 @(test)

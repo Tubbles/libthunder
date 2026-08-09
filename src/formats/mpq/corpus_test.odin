@@ -1,5 +1,7 @@
 package mpq
 
+import "core:crypto/sha2"
+import "core:encoding/hex"
 import "core:log"
 import "core:os"
 import "core:path/filepath"
@@ -74,6 +76,59 @@ corpus_war3_mpq_extracts_listfile :: proc(t: ^testing.T) {
 	defer delete(listfile)
 	testing.expect_value(t, read_error, Error.None)
 	testing.expect(t, strings.contains(string(listfile), "common.j"), "listfile lacks common.j")
+}
+
+// SHA-256 of extracted content must match an independent decode of
+// the same archive by mpyq 0.2.5, a pure-Python MPQ reader (hashes
+// recorded 2026-08-09, WI-0006 log). mpyq handles only unencrypted
+// zlib or uncompressed files, so the sample spans those storage
+// forms; the PKWARE, Huffman, and ADPCM codecs are instead verified
+// against reference vectors in their own unit tests.
+@(test)
+corpus_extraction_matches_external_oracle :: proc(t: ^testing.T) {
+	path := corpus_path("War3.mpq")
+	defer delete(path)
+	if !os.exists(path) {
+		log.info("corpus absent, skipping")
+		return
+	}
+
+	archive, open_error := open(path)
+	testing.expect_value(t, open_error, Error.None)
+	defer close(archive)
+
+	Oracle_Sample :: struct {
+		name:            string,
+		expected_sha256: string,
+	}
+	samples := [?]Oracle_Sample {
+		{"Scripts\\common.j", "3c21e998bf80d1e04718bd3f2ee7ef2bf1b83359e5b303a56cf59cd61a2afdcd"},
+		{"Scripts\\Blizzard.j", "7ca28f0ce47712a9ab6832c22bb0d0c9d2844b5831fb465b9d792731a3d5243e"},
+		{"Units\\UnitData.slk", "34a0c8083f146b5d3e25d92a19a8822151d4b26dfe9c1c325a6229466d1b04d6"},
+		{"ReplaceableTextures\\Selection\\SelectionCircleLarge.blp", "1b5cb24c47aa63cb91328471e16613e2058449c7494ffbab18a89be8f70eed71"},
+		{"UI\\MiscData.txt", "d097d3cbb4a03719a97591900b45ab42fdb847385819c3d5e7dd7b47d7d9b516"},
+		{"ReplaceableTextures\\WorldEditUI\\Editor-Toolbar-MapValidation.blp", "6ca051be3831f122c0bb0fc13a823153e359fa5ebb38d955013a63f0e058bce6"},
+	}
+	for sample in samples {
+		content, read_error := read_file(archive, sample.name)
+		defer delete(content)
+		testing.expect_value(t, read_error, Error.None)
+
+		digest: [sha2.DIGEST_SIZE_256]u8
+		digest_context: sha2.Context_256
+		sha2.init_256(&digest_context)
+		sha2.update(&digest_context, content)
+		sha2.final(&digest_context, digest[:])
+		digest_hex, _ := hex.encode(digest[:])
+		defer delete(digest_hex)
+		testing.expectf(
+			t,
+			string(digest_hex) == sample.expected_sha256,
+			"%s: got %s",
+			sample.name,
+			string(digest_hex),
+		)
+	}
 }
 
 @(test)
