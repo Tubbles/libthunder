@@ -1,6 +1,6 @@
 # WI-0006: MPQ v1 reader
 
-Status: backlog
+Status: in review
 
 ## Goal
 
@@ -28,3 +28,6 @@ scripts/check.sh green in CI; corpus test run on this machine logged with per-ar
 ## Log
 
 - 2026-08-01: created from the file-formats survey's implementation order.
+- 2026-08-09: implemented in src/formats/mpq. Cipher and hash verified against the format's published reference constants; synthetic archives cover raw, encrypted, zlib single-unit, HM3W-prefixed, and header-scan paths. PKWARE explode, Huffman, and ADPCM codecs were built by subagents in isolated scratch packages against StormLib/blast references (read, not copied) and integrated after their own test suites passed (10 + 14 tests).
+- 2026-08-09: full corpus sweep (THUNDER_CORPUS_SWEEP=1): every listfile entry of every manifest archive extracts. War3.mpq 9168, War3x.mpq 7671, War3xLocal.mpq 2555, War3Local.mpq 1315, Deprecated.mpq 669; 21378 total, 0 missing, 0 unsupported, 0 failed. bzip2/sparse never occur in the 1.29.2 corpus and remain intentionally unimplemented (error cleanly).
+- 2026-08-09: status to in review; independent review pass pending per process.md.
