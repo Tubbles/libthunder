@@ -16,10 +16,11 @@ mkdir -p "${repository_root}/tmp"
 vet_flags=(-vet -strict-style -warnings-as-errors)
 
 exit_status=0
-for package_directory in "${repository_root}"/src/*/; do
+while IFS= read -r package_directory; do
     echo "== ${package_directory}"
     "${odin}" test "${package_directory}" \
+        -collection:thunder="${repository_root}/src" \
         -out:"${repository_root}/tmp/test_binary" \
         "${vet_flags[@]}" || exit_status=1
-done
+done < <(find "${repository_root}/src" -name '*.odin' -printf '%h\n' | sort -u)
 exit "${exit_status}"
