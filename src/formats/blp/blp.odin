@@ -1,9 +1,9 @@
 package blp
 
 // BLP1 texture decoding to RGBA8. Two content flavors exist in the
-// 1.29.2 corpus (surveyed in WI-0008): palettized (256-color BGRX
-// palette, per-mip index plane plus an alpha plane iff alpha_bits is
-// 8) and JPEG (shared SOI/DQT/DHT header plus per-mip baseline scans
+// 1.29.2 corpus (surveyed in WI-0008): palettized (BGRX palette of up
+// to 256 entries, per-mip index plane plus an alpha plane iff
+// alpha_bits is 8) and JPEG (shared header plus per-mip baseline scans
 // whose 4 raw components are B,G,R,A with no color transform). The
 // alpha-plane rule was established empirically against the corpus:
 // alpha_bits governs it, the picture_type field does not.
@@ -102,16 +102,32 @@ decode_mip :: proc(data: []u8, mip_index: int, allocator := context.allocator) -
 
 @(private)
 decode_palettized_mip :: proc(data: []u8, texture_info: Info, mip_data: []u8, width: int, height: int, allocator: runtime.Allocator) -> (pixels: []u8, error: Error) {
-	if len(data) < HEADER_SIZE + PALETTE_SIZE {
-		return nil, .Corrupt_Data
+	// The palette nominally holds 256 BGRX entries, but Blizzard's own
+	// files can truncate it to the entries the index planes reference:
+	// War3.mpq's Editor-Toolbar-MapValidation.blp stores 10 entries,
+	// with mip 0 starting 40 bytes after the header. The palette ends
+	// wherever the first mip begins (or the file ends), and each index
+	// is validated against the entries actually stored.
+	palette_end := min(len(data), HEADER_SIZE + PALETTE_SIZE)
+	for mip_index in 0 ..< texture_info.mip_count {
+		first_byte_of_mip := int(read_u32(data, 28 + mip_index * 4))
+		if first_byte_of_mip >= HEADER_SIZE {
+			palette_end = min(palette_end, first_byte_of_mip)
+		}
 	}
-	palette := data[HEADER_SIZE:HEADER_SIZE + PALETTE_SIZE]
+	available_entry_count := (palette_end - HEADER_SIZE) / 4
+	palette := data[HEADER_SIZE:HEADER_SIZE + available_entry_count * 4]
 
 	pixel_count := width * height
 	has_alpha_plane := texture_info.alpha_bits == 8
 	expected_mip_size := pixel_count * 2 if has_alpha_plane else pixel_count
 	if len(mip_data) < expected_mip_size {
 		return nil, .Corrupt_Data
+	}
+	for pixel_index in 0 ..< pixel_count {
+		if int(mip_data[pixel_index]) >= available_entry_count {
+			return nil, .Corrupt_Data
+		}
 	}
 
 	pixels = make([]u8, pixel_count * 4, allocator)

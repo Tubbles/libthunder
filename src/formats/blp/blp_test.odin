@@ -4,9 +4,10 @@ import "core:testing"
 
 // Builds a 4x2 palettized BLP1 with two mips and a distinctive
 // palette, exercising decode exactly per the empirically established
-// layout (see blp.odin header comment).
+// layout (see blp.odin header comment). The palette may be truncated
+// below 256 entries, as Blizzard's own files sometimes are.
 @(private = "file")
-build_synthetic_palettized :: proc(alpha_bits: u32, allocator := context.allocator) -> [dynamic]u8 {
+build_synthetic_palettized :: proc(alpha_bits: u32, palette_entry_count := 256, allocator := context.allocator) -> [dynamic]u8 {
 	width :: 4
 	height :: 2
 	buffer := make([dynamic]u8, allocator)
@@ -26,7 +27,7 @@ build_synthetic_palettized :: proc(alpha_bits: u32, allocator := context.allocat
 	mip0_pixels :: width * height
 	mip1_pixels :: 2 * 1
 	plane_factor := 2 if alpha_bits == 8 else 1
-	mip0_offset := HEADER_SIZE + PALETTE_SIZE
+	mip0_offset := HEADER_SIZE + palette_entry_count * 4
 	mip0_size := mip0_pixels * plane_factor
 	mip1_size := mip1_pixels * plane_factor
 
@@ -52,7 +53,7 @@ build_synthetic_palettized :: proc(alpha_bits: u32, allocator := context.allocat
 	}
 
 	// Palette: entry N is BGRX (10+N, 20+N, 30+N, junk).
-	for palette_index in 0 ..< 256 {
+	for palette_index in 0 ..< palette_entry_count {
 		append(&buffer, u8(10 + palette_index % 200), u8(20 + palette_index % 200), u8(30 + palette_index % 200), 0xEE)
 	}
 
@@ -117,6 +118,38 @@ palettized_without_alpha_is_opaque :: proc(t: ^testing.T) {
 	for pixel_index in 0 ..< 8 {
 		testing.expect_value(t, pixels[pixel_index * 4 + 3], u8(255))
 	}
+}
+
+// Regression for War3.mpq's Editor-Toolbar-MapValidation.blp: the
+// palette may hold fewer than 256 entries, with mip 0 starting right
+// after the last stored entry. The reader must accept that and still
+// reject indices that point past what is stored.
+@(test)
+palettized_truncated_palette_decodes :: proc(t: ^testing.T) {
+	data := build_synthetic_palettized(8, palette_entry_count = 8)
+	defer delete(data)
+
+	pixels, width, height, decode_error := decode_mip(data[:], 0)
+	defer delete(pixels)
+	testing.expect_value(t, decode_error, Error.None)
+	testing.expect_value(t, width, 4)
+	testing.expect_value(t, height, 2)
+	// Pixel 3 uses palette entry 3 (BGRX 13,23,33) and alpha 103.
+	testing.expect_value(t, pixels[3 * 4 + 0], u8(33))
+	testing.expect_value(t, pixels[3 * 4 + 1], u8(23))
+	testing.expect_value(t, pixels[3 * 4 + 2], u8(13))
+	testing.expect_value(t, pixels[3 * 4 + 3], u8(103))
+}
+
+@(test)
+palettized_index_beyond_truncated_palette_errors :: proc(t: ^testing.T) {
+	// Mip 0 references indices up to 7, but only 4 entries are stored.
+	data := build_synthetic_palettized(8, palette_entry_count = 4)
+	defer delete(data)
+
+	pixels, _, _, decode_error := decode_mip(data[:], 0)
+	testing.expect_value(t, decode_error, Error.Corrupt_Data)
+	testing.expect(t, pixels == nil)
 }
 
 @(test)
