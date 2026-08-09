@@ -1,5 +1,6 @@
 package jpeg
 
+import "core:mem"
 import "core:testing"
 
 // Fixtures below were generated with Pillow 10.2.0 (python3), quality
@@ -334,7 +335,7 @@ restart_gray_jpeg := [381]u8{
 
 @(test)
 solid_color_four_component_decodes_exactly :: proc(t: ^testing.T) {
-	result, error := decode_component_planes(solid_cmyk_jpeg[:])
+	result, error := decode_component_planes(solid_cmyk_jpeg[:], 16, 16)
 	defer destroy(&result)
 	testing.expect_value(t, error, Error.None)
 	testing.expect_value(t, result.width, 16)
@@ -351,7 +352,7 @@ solid_color_four_component_decodes_exactly :: proc(t: ^testing.T) {
 
 @(test)
 gradient_four_component_decodes_within_tolerance :: proc(t: ^testing.T) {
-	result, error := decode_component_planes(gradient_cmyk_jpeg[:])
+	result, error := decode_component_planes(gradient_cmyk_jpeg[:], 16, 16)
 	defer destroy(&result)
 	testing.expect_value(t, error, Error.None)
 	testing.expect_value(t, result.width, 16)
@@ -374,7 +375,7 @@ gradient_four_component_decodes_within_tolerance :: proc(t: ^testing.T) {
 
 @(test)
 non_multiple_of_eight_dimensions_clip_correctly :: proc(t: ^testing.T) {
-	result, error := decode_component_planes(clipped_gray_jpeg[:])
+	result, error := decode_component_planes(clipped_gray_jpeg[:], 20, 12)
 	defer destroy(&result)
 	testing.expect_value(t, error, Error.None)
 	testing.expect_value(t, result.width, 20)
@@ -391,7 +392,7 @@ non_multiple_of_eight_dimensions_clip_correctly :: proc(t: ^testing.T) {
 
 @(test)
 grayscale_one_component_decodes_exactly :: proc(t: ^testing.T) {
-	result, error := decode_component_planes(solid_gray_jpeg[:])
+	result, error := decode_component_planes(solid_gray_jpeg[:], 16, 16)
 	defer destroy(&result)
 	testing.expect_value(t, error, Error.None)
 	testing.expect_value(t, result.width, 16)
@@ -405,7 +406,7 @@ grayscale_one_component_decodes_exactly :: proc(t: ^testing.T) {
 
 @(test)
 rgb_three_component_decodes_plausibly :: proc(t: ^testing.T) {
-	result, error := decode_component_planes(solid_rgb_jpeg[:])
+	result, error := decode_component_planes(solid_rgb_jpeg[:], 16, 16)
 	defer destroy(&result)
 	testing.expect_value(t, error, Error.None)
 	testing.expect_value(t, result.width, 16)
@@ -425,7 +426,7 @@ rgb_three_component_decodes_plausibly :: proc(t: ^testing.T) {
 
 @(test)
 restart_markers_reset_dc_predictor_correctly :: proc(t: ^testing.T) {
-	result, error := decode_component_planes(restart_gray_jpeg[:])
+	result, error := decode_component_planes(restart_gray_jpeg[:], 32, 32)
 	defer destroy(&result)
 	testing.expect_value(t, error, Error.None)
 	testing.expect_value(t, result.width, 32)
@@ -443,14 +444,58 @@ restart_markers_reset_dc_predictor_correctly :: proc(t: ^testing.T) {
 @(test)
 truncated_stream_is_corrupt :: proc(t: ^testing.T) {
 	truncated := solid_cmyk_jpeg[:len(solid_cmyk_jpeg) - 20]
-	result, error := decode_component_planes(truncated)
+	result, error := decode_component_planes(truncated, 16, 16)
+	defer destroy(&result)
+	testing.expect_value(t, error, Error.Corrupt_Stream)
+}
+
+// Regression: SOF dimensions used to drive the plane allocations
+// unchecked, so a malformed SOF claiming 8192x8192 allocated ~256 MiB
+// before the decode failed. The small arena proves rejection now
+// happens before any plane allocation.
+@(test)
+sof_dimensions_disagreeing_with_caller_are_rejected :: proc(t: ^testing.T) {
+	oversized := solid_cmyk_jpeg
+	for index in 0..<len(oversized) - 8 {
+		if oversized[index] == 0xFF && oversized[index + 1] == 0xC0 {
+			oversized[index + 5] = 0x20 // height 8192
+			oversized[index + 6] = 0x00
+			oversized[index + 7] = 0x20 // width 8192
+			oversized[index + 8] = 0x00
+			break
+		}
+	}
+
+	backing := make([]u8, 64 * 1024)
+	defer delete(backing)
+	arena: mem.Arena
+	mem.arena_init(&arena, backing)
+	result, error := decode_component_planes(oversized[:], 16, 16, mem.arena_allocator(&arena))
+	testing.expect_value(t, error, Error.Corrupt_Stream)
+	testing.expect_value(t, result.component_count, 0)
+}
+
+// Regression: the zero value of an undefined Huffman table used to
+// decode as if it held a 1-bit code, so a stream with no DQT/DHT at
+// all "decoded" into a garbage plane instead of erroring.
+@(test)
+scan_referencing_undefined_tables_is_corrupt :: proc(t: ^testing.T) {
+	// SOI, SOF0 (8x8 grayscale), SOS, entropy bytes, EOI; no tables.
+	stream := [?]u8{
+		0xFF, 0xD8,
+		0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x00, 0x08, 0x00, 0x08, 0x01, 0x01, 0x11, 0x00,
+		0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00,
+		0x00, 0x00, 0x00, 0x00,
+		0xFF, 0xD9,
+	}
+	result, error := decode_component_planes(stream[:], 8, 8)
 	defer destroy(&result)
 	testing.expect_value(t, error, Error.Corrupt_Stream)
 }
 
 @(test)
 progressive_jpeg_is_unsupported :: proc(t: ^testing.T) {
-	result, error := decode_component_planes(progressive_jpeg[:])
+	result, error := decode_component_planes(progressive_jpeg[:], 16, 16)
 	defer destroy(&result)
 	testing.expect_value(t, error, Error.Unsupported_Feature)
 }

@@ -33,7 +33,12 @@ Decoded_Planes :: struct {
 //
 // `stream` must start with the SOI marker. Anything past the first
 // (and only supported) scan is ignored, including a missing EOI.
-decode_component_planes :: proc(stream: []u8, allocator := context.allocator) -> (result: Decoded_Planes, error: Error) {
+//
+// The caller states the dimensions it expects (BLP records them in
+// its own header); a SOF that disagrees is corrupt, and rejecting it
+// there keeps plane allocations bounded by caller-known sizes instead
+// of by whatever a malformed SOF claims.
+decode_component_planes :: proc(stream: []u8, expected_width: int, expected_height: int, allocator := context.allocator) -> (result: Decoded_Planes, error: Error) {
 	reader := Byte_Reader{data = stream}
 
 	first_byte := read_u8(&reader) or_return
@@ -76,6 +81,9 @@ decode_component_planes :: proc(stream: []u8, allocator := context.allocator) ->
 				return result, .Corrupt_Stream
 			}
 			frame = parse_sof0(&reader) or_return
+			if frame.width != expected_width || frame.height != expected_height {
+				return result, .Corrupt_Stream
+			}
 			have_frame = true
 		case .SOF1, .SOF2, .SOF3, .SOF5, .SOF6, .SOF7, .SOF9, .SOF10, .SOF11, .SOF13, .SOF14, .SOF15:
 			return result, .Unsupported_Feature
@@ -123,7 +131,10 @@ BLOCK_SIZE :: 8
 COEFFICIENTS_PER_BLOCK :: 64
 INVERSE_SQRT2 :: 0.70710678118654752440
 
-Quantization_Table :: [COEFFICIENTS_PER_BLOCK]u16
+Quantization_Table :: struct {
+	defined: bool,
+	values:  [COEFFICIENTS_PER_BLOCK]u16,
+}
 
 // Natural (row-major, frequency-space) index for the k-th coefficient
 // of a zigzag-ordered scan, per ITU T.81 Annex A, Figure A.6.
@@ -289,8 +300,9 @@ parse_dqt :: proc(reader: ^Byte_Reader, quantization_tables: ^[MAX_QUANTIZATION_
 
 		table_bytes := read_slice(reader, COEFFICIENTS_PER_BLOCK) or_return
 		for value, coefficient_index in table_bytes {
-			quantization_tables[table_index][coefficient_index] = u16(value)
+			quantization_tables[table_index].values[coefficient_index] = u16(value)
 		}
+		quantization_tables[table_index].defined = true
 
 		remaining -= 1 + COEFFICIENTS_PER_BLOCK
 	}
@@ -390,8 +402,11 @@ parse_sos :: proc(reader: ^Byte_Reader, frame: Frame_Info) -> (scan_components: 
 
 // Canonical Huffman decoding table built from the code-length counts
 // and symbol list of a DHT segment, using the min-code/max-code/
-// value-offset scheme of ITU T.81 Annex F.2.2.3.
+// value-offset scheme of ITU T.81 Annex F.2.2.3. `defined` guards
+// against a scan referencing a table no DHT ever filled in: the
+// zero value would otherwise decode as if it held a 1-bit code.
 Huffman_Table :: struct {
+	defined:      bool,
 	min_code:     [17]int,
 	max_code:     [17]int, // -1 means no codes of this length
 	value_offset: [17]int,
@@ -399,6 +414,7 @@ Huffman_Table :: struct {
 }
 
 build_huffman_table :: proc(code_length_counts: []u8, symbols: []u8) -> (table: Huffman_Table, error: Error) {
+	table.defined = true
 	copy(table.symbols[:len(symbols)], symbols)
 
 	code := 0
@@ -537,7 +553,7 @@ decode_block :: proc(
 	}
 	dc_bits := read_bits(reader, int(dc_category)) or_return
 	previous_dc^ += extend_coefficient(dc_bits, int(dc_category))
-	block[0] = f32(previous_dc^ * int(quantization_table[0]))
+	block[0] = f32(previous_dc^ * int(quantization_table.values[0]))
 
 	scan_index := 1
 	for scan_index < COEFFICIENTS_PER_BLOCK {
@@ -559,7 +575,7 @@ decode_block :: proc(
 		coefficient_bits := read_bits(reader, category) or_return
 		coefficient := extend_coefficient(coefficient_bits, category)
 		natural_index := zigzag_order[scan_index]
-		block[natural_index] = f32(coefficient * int(quantization_table[scan_index]))
+		block[natural_index] = f32(coefficient * int(quantization_table.values[scan_index]))
 		scan_index += 1
 	}
 
@@ -653,6 +669,18 @@ decode_entropy_coded_data :: proc(
 	restart_interval: int,
 	allocator: runtime.Allocator,
 ) -> (result: Decoded_Planes, error: Error) {
+	// Every table the scan references must have been filled in by an
+	// actual DQT/DHT segment; the zero value of an undefined table
+	// would otherwise decode malformed streams into garbage planes.
+	for scan_index in 0..<frame.component_count {
+		scan_component := scan_components[scan_index]
+		if !dc_huffman_tables[scan_component.dc_table_index].defined ||
+		   !ac_huffman_tables[scan_component.ac_table_index].defined ||
+		   !quantization_tables[frame.components[scan_component.sof_index].quantization_table_index].defined {
+			return result, .Corrupt_Stream
+		}
+	}
+
 	result.width = frame.width
 	result.height = frame.height
 	result.component_count = frame.component_count

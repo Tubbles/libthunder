@@ -16,7 +16,7 @@ decode_jpeg_mip :: proc(data: []u8, texture_info: Info, mip_data: []u8, width: i
 	}
 	shared_header_size := int(read_u32(data, HEADER_SIZE))
 	shared_header_start := HEADER_SIZE + 4
-	if shared_header_size < 0 || shared_header_start + shared_header_size > len(data) {
+	if shared_header_start + shared_header_size > len(data) {
 		return nil, .Corrupt_Data
 	}
 	shared_header := data[shared_header_start:shared_header_start + shared_header_size]
@@ -26,15 +26,14 @@ decode_jpeg_mip :: proc(data: []u8, texture_info: Info, mip_data: []u8, width: i
 	copy(stream, shared_header)
 	copy(stream[len(shared_header):], mip_data)
 
-	planes, jpeg_error := jpeg.decode_component_planes(stream, allocator)
+	// The decoder validates its SOF against these dimensions before
+	// allocating, so a stream disagreeing with the BLP header cannot
+	// drive plane sizes.
+	planes, jpeg_error := jpeg.decode_component_planes(stream, width, height, allocator)
 	if jpeg_error != .None {
 		return nil, .Corrupt_Data
 	}
 	defer jpeg.destroy(&planes)
-
-	if planes.width != width || planes.height != height {
-		return nil, .Corrupt_Data
-	}
 
 	pixel_count := width * height
 	pixels = make([]u8, pixel_count * 4, allocator)
