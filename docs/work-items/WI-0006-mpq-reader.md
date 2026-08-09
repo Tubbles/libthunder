@@ -1,6 +1,6 @@
 # WI-0006: MPQ v1 reader
 
-Status: in review
+Status: done
 
 ## Goal
 
@@ -31,3 +31,5 @@ scripts/check.sh green in CI; corpus test run on this machine logged with per-ar
 - 2026-08-09: implemented in src/formats/mpq. Cipher and hash verified against the format's published reference constants; synthetic archives cover raw, encrypted, zlib single-unit, HM3W-prefixed, and header-scan paths. PKWARE explode, Huffman, and ADPCM codecs were built by subagents in isolated scratch packages against StormLib/blast references (read, not copied) and integrated after their own test suites passed (10 + 14 tests).
 - 2026-08-09: full corpus sweep (THUNDER_CORPUS_SWEEP=1): every listfile entry of every manifest archive extracts. War3.mpq 9168, War3x.mpq 7671, War3xLocal.mpq 2555, War3Local.mpq 1315, Deprecated.mpq 669; 21378 total, 0 missing, 0 unsupported, 0 failed. bzip2/sparse never occur in the 1.29.2 corpus and remain intentionally unimplemented (error cleanly).
 - 2026-08-09: status to in review; independent review pass pending per process.md.
+- 2026-08-09: independent review returned five findings, all probe-confirmed: three robustness defects (a failed single-unit decompression freed its buffer twice; sector_size_shift unvalidated, letting 512 << shift wrap to zero or negative; block size fields trusted before allocating) and two LOW (entropy-coder dispatch order differs from StormLib; test gaps). The defects were fixed in 53c9060 ("Fix MPQ robustness defects found by independent review") with regression tests verified to fail against the pre-fix code. The test gaps were closed in dafc68b ("Close MPQ review test gaps"): extraction spot-checked against SHA-256 hashes from mpyq 0.2.5 as an independent oracle, plus a hermetic two-sector zlib fixture for the sectored path. The dispatch-order finding is accepted as is because it is only observable for method masks combining multiple entropy coders and the full 21378-file sweep decodes clean; recorded in SUGGESTIONS.md for revisiting if a community map ever presents one.
+- 2026-08-09: fix-verification pass by a second independent subagent confirmed all findings resolved and found no new defects. Its probes measured every genuine archive on hand (5 game MPQs, 186 stock maps, 1 campaign archive): all use sector shift 3, all 24854 block entries satisfy the new containment check, and the largest genuine file is ~44 MiB against the 512 MiB cap, so the new validation rejects nothing genuine. Status to done.
