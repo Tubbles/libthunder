@@ -154,8 +154,9 @@ corpus_full_sweep :: proc(t: ^testing.T) {
 				if unsupported_count <= 20 {
 					log.infof("%s: unsupported compression: %s", archive_name, file_name)
 				}
-			case .Cannot_Open_File, .No_Archive_Header, .Invalid_Table, .Read_Failed,
-			     .Corrupt_Sector_Table, .Decompression_Failed, .Size_Mismatch:
+			case .Cannot_Open_File, .No_Archive_Header, .Invalid_Header, .Invalid_Table,
+			     .File_Too_Large, .Read_Failed, .Corrupt_Sector_Table, .Decompression_Failed,
+			     .Size_Mismatch:
 				failed_count += 1
 				if failed_count <= 20 {
 					log.infof("%s: %v: %s", archive_name, read_error, file_name)

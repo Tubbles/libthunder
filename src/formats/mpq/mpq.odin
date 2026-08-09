@@ -13,7 +13,9 @@ Error :: enum {
 	None,
 	Cannot_Open_File,
 	No_Archive_Header,
+	Invalid_Header,
 	Invalid_Table,
+	File_Too_Large,
 	File_Not_Found,
 	Read_Failed,
 	Corrupt_Sector_Table,
@@ -26,8 +28,13 @@ HEADER_SIZE :: 32
 HEADER_ALIGNMENT :: 0x200
 MPQ_MAGIC := [4]u8{'M', 'P', 'Q', 0x1A}
 
-// Guard against absurd table counts from corrupt or hostile archives.
+// Guards against absurd values from corrupt or deliberately malformed
+// archives ("protected" community maps violate the spec on purpose).
+// Real WC3 archives use a small sector shift (sector sizes in the low
+// KiB) and no single file approaches these ceilings.
 MAXIMUM_TABLE_COUNT :: 0x10_0000
+MAXIMUM_SECTOR_SIZE_SHIFT :: 20
+MAXIMUM_UNCOMPRESSED_FILE_SIZE :: 512 * 1024 * 1024
 
 BLOCK_FLAG_IMPLODED :: u32(0x0000_0100)
 BLOCK_FLAG_COMPRESSED :: u32(0x0000_0200)
@@ -69,6 +76,7 @@ Block_Entry :: struct {
 Archive :: struct {
 	file:           ^os.File,
 	archive_offset: i64,
+	file_size:      i64,
 	header:         Header,
 	sector_size:    int,
 	hash_table:     []Hash_Entry,
@@ -124,6 +132,11 @@ open :: proc(path: string, allocator := context.allocator) -> (archive: ^Archive
 	// The real engine ignores format_version entirely (protected maps
 	// fake it), so it is recorded but deliberately not validated.
 
+	// Beyond the cap, 512 << shift wraps to zero or negative, which
+	// would mean division by zero or runaway sector buffers downstream.
+	if header.sector_size_shift > MAXIMUM_SECTOR_SIZE_SHIFT {
+		return nil, .Invalid_Header
+	}
 	if header.hash_table_count > MAXIMUM_TABLE_COUNT || header.block_table_count > MAXIMUM_TABLE_COUNT {
 		return nil, .Invalid_Table
 	}
@@ -184,6 +197,7 @@ open :: proc(path: string, allocator := context.allocator) -> (archive: ^Archive
 	archive^ = Archive {
 		file           = file,
 		archive_offset = archive_offset,
+		file_size      = file_size,
 		header         = header,
 		sector_size    = 512 << header.sector_size_shift,
 		hash_table     = hash_table,
@@ -243,6 +257,15 @@ read_file :: proc(archive: ^Archive, name: string, allocator := context.allocato
 	if uncompressed_size == 0 {
 		return make([]u8, 0, allocator), .None
 	}
+	// Validate the block's size fields before allocating from them: the
+	// stored bytes must actually fit inside the archive file, and the
+	// claimed decompressed size must be plausible for WC3 data.
+	if i64(block.data_offset) + i64(block.compressed_size) > archive.file_size - archive.archive_offset {
+		return nil, .Read_Failed
+	}
+	if block.uncompressed_size > MAXIMUM_UNCOMPRESSED_FILE_SIZE {
+		return nil, .File_Too_Large
+	}
 
 	encryption_key: u32
 	if block.flags & BLOCK_FLAG_ENCRYPTED != 0 {
@@ -264,22 +287,21 @@ read_file :: proc(archive: ^Archive, name: string, allocator := context.allocato
 @(private)
 read_single_unit :: proc(archive: ^Archive, block: Block_Entry, encryption_key: u32, allocator: runtime.Allocator) -> (data: []u8, error: Error) {
 	stored := make([]u8, block.compressed_size, allocator)
-	defer if error != .None {
-		delete(stored, allocator)
-	}
 	if !read_exact(archive, i64(block.data_offset), stored) {
+		delete(stored, allocator)
 		return nil, .Read_Failed
 	}
 	if block.flags & BLOCK_FLAG_ENCRYPTED != 0 {
 		decrypt_block(stored, encryption_key)
 	}
 
-	uncompressed_size := int(block.uncompressed_size)
 	if block.compressed_size == block.uncompressed_size {
 		return stored, .None
 	}
+	// This defer is only reached on the decompression path, so `stored`
+	// is freed exactly once whether decompression succeeds or fails.
 	defer delete(stored, allocator)
-	return decompress_stored_sector(block.flags, stored, uncompressed_size, allocator)
+	return decompress_stored_sector(block.flags, stored, int(block.uncompressed_size), allocator)
 }
 
 @(private)

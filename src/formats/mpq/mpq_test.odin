@@ -1,5 +1,6 @@
 package mpq
 
+import "core:mem"
 import "core:os"
 import "core:path/filepath"
 import "core:testing"
@@ -217,6 +218,120 @@ header_is_found_behind_aligned_prefix :: proc(t: ^testing.T) {
 	defer delete(plain)
 	testing.expect_value(t, plain_error, Error.None)
 	testing.expect_value(t, string(plain), PLAIN_CONTENT)
+}
+
+@(test)
+open_rejects_oversized_sector_shift :: proc(t: ^testing.T) {
+	files := default_files()
+	defer destroy_files(files)
+	archive_bytes := build_synthetic_archive(0, files)
+	defer delete(archive_bytes)
+	// The version/shift word sits at header offset 12; rewrite the
+	// shift half (upper 16 bits) to just above the accepted cap.
+	archive_bytes[12] = 0
+	archive_bytes[13] = 0
+	archive_bytes[14] = MAXIMUM_SECTOR_SIZE_SHIFT + 1
+	archive_bytes[15] = 0
+
+	path, _ := filepath.join({#directory, "..", "..", "..", "tmp", "synthetic_bad_shift.mpq"})
+	defer delete(path)
+	write_error := os.write_entire_file(path, archive_bytes[:])
+	testing.expect(t, write_error == nil)
+
+	_, open_error := open(path)
+	testing.expect_value(t, open_error, Error.Invalid_Header)
+}
+
+@(test)
+failed_single_unit_decompression_frees_cleanly :: proc(t: ^testing.T) {
+	// Regression: this path used to register two cleanup defers that
+	// both owned the stored buffer, so a failed decompression freed it
+	// twice. The tracking allocator records any such repeat free.
+	garbage := [?]u8{COMPRESSION_ZLIB, 0xDE, 0xAD, 0xBE, 0xEF}
+	files := [?]Synthetic_File {
+		{"broken.bin", garbage[:], 64, BLOCK_FLAG_EXISTS | BLOCK_FLAG_COMPRESSED | BLOCK_FLAG_SINGLE_UNIT},
+	}
+	archive := write_and_open(t, "synthetic_broken_single_unit.mpq", 0, files[:])
+	if archive == nil {
+		return
+	}
+	defer close(archive)
+
+	tracking: mem.Tracking_Allocator
+	mem.tracking_allocator_init(&tracking, context.allocator)
+	defer mem.tracking_allocator_destroy(&tracking)
+	tracking.bad_free_callback = mem.tracking_allocator_bad_free_callback_add_to_array
+
+	data, read_error := read_file(archive, "broken.bin", mem.tracking_allocator(&tracking))
+	testing.expect_value(t, read_error, Error.Decompression_Failed)
+	testing.expect(t, data == nil)
+	testing.expect_value(t, len(tracking.bad_free_array), 0)
+	testing.expect_value(t, len(tracking.allocation_map), 0)
+}
+
+@(test)
+read_rejects_stored_size_beyond_file :: proc(t: ^testing.T) {
+	stored := [?]u8{'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'}
+	files := [?]Synthetic_File {
+		{"huge.bin", stored[:], 16, BLOCK_FLAG_EXISTS | BLOCK_FLAG_COMPRESSED | BLOCK_FLAG_SINGLE_UNIT},
+	}
+	archive_bytes := build_synthetic_archive(0, files[:])
+	defer delete(archive_bytes)
+
+	// Rewrite the block entry's stored size (second u32) to ~4 GiB,
+	// far beyond the end of the archive file. The table is encrypted
+	// in place, and sits after the data and the 4-entry hash table.
+	block_table_offset := HEADER_SIZE + len(stored) + 4 * 16
+	block_table := archive_bytes[block_table_offset:block_table_offset + 16]
+	decrypt_block(block_table, hash_string("(block table)", .File_Key))
+	block_table[4] = 0x00
+	block_table[5] = 0x00
+	block_table[6] = 0x00
+	block_table[7] = 0xF0
+	encrypt_block(block_table, hash_string("(block table)", .File_Key))
+
+	path, _ := filepath.join({#directory, "..", "..", "..", "tmp", "synthetic_overrun_block.mpq"})
+	defer delete(path)
+	write_error := os.write_entire_file(path, archive_bytes[:])
+	testing.expect(t, write_error == nil)
+
+	archive, open_error := open(path)
+	testing.expect_value(t, open_error, Error.None)
+	if archive == nil {
+		return
+	}
+	defer close(archive)
+
+	// Must fail before allocating the claimed ~4 GiB: serve the read
+	// from a small fixed arena that such an allocation would burst.
+	backing := make([]u8, 64 * 1024)
+	defer delete(backing)
+	arena: mem.Arena
+	mem.arena_init(&arena, backing)
+	data, read_error := read_file(archive, "huge.bin", mem.arena_allocator(&arena))
+	testing.expect_value(t, read_error, Error.Read_Failed)
+	testing.expect(t, data == nil)
+}
+
+@(test)
+read_rejects_uncompressed_size_over_cap :: proc(t: ^testing.T) {
+	stored := [?]u8{'A', 'B', 'C', 'D'}
+	files := [?]Synthetic_File {
+		{"bloated.bin", stored[:], MAXIMUM_UNCOMPRESSED_FILE_SIZE + 1, BLOCK_FLAG_EXISTS | BLOCK_FLAG_COMPRESSED | BLOCK_FLAG_SINGLE_UNIT},
+	}
+	archive := write_and_open(t, "synthetic_bloated.mpq", 0, files[:])
+	if archive == nil {
+		return
+	}
+	defer close(archive)
+
+	backing := make([]u8, 64 * 1024)
+	defer delete(backing)
+	arena: mem.Arena
+	mem.arena_init(&arena, backing)
+	data, read_error := read_file(archive, "bloated.bin", mem.arena_allocator(&arena))
+	testing.expect_value(t, read_error, Error.File_Too_Large)
+	testing.expect(t, data == nil)
 }
 
 @(test)
