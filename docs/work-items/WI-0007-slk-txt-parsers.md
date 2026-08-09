@@ -1,6 +1,6 @@
 # WI-0007: SLK and TXT gameplay data parsers
 
-Status: backlog
+Status: in review
 
 ## Goal
 
@@ -21,3 +21,6 @@ scripts/check.sh green in CI; corpus parse counts logged.
 ## Log
 
 - 2026-08-01: created from the file-formats survey's implementation order.
+- 2026-08-09: implemented as src/formats/slk (sticky-row/column C records, ";;" escape, typed cells) and src/formats/ini (order-preserving sections, // comments, last-wins lookup). Corpus: UnitData/UnitBalance/UnitWeapons/UnitAbilities/UnitUI.slk all parse (837-838 rows each, footman row found in each); UI\MiscData.txt parses with a spot-checked value (Misc/GoldTextColor). Strictness decision recorded in code: out-of-bounds cells are a parse error rather than a crash mirror.
+- 2026-08-09: found and fixed an ownership bug the leak tracker caught: Odin defers cannot patch return values after copy-out, so parse now returns an empty table on error instead of a dangling one.
+- 2026-08-09: status to in review; independent review pass pending per process.md.
