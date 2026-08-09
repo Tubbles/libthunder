@@ -1,0 +1,6 @@
+# Suggestions
+
+Ideas noticed during work, not yet commissioned by the owner. See docs/process.md for how work gets commissioned; striking or promoting entries is the owner's call.
+
+- Report the core:image/tga destroy leak upstream to odin-lang/Odin: `tga.destroy` early-returns on zero width/height without freeing the Image struct (observed in `toolchain/odin/core/image/tga/tga.odin:389` of dev-2026-07a, found during the WI-0008 review, 2026-08-09). Our wrapper (src/formats/targa/tga.odin) pre-rejects zero-dimension headers so libthunder is not affected, but the fix belongs upstream.
+- Consider fuzzing the format parsers (mpq, slk, ini, blp) once a corpus-seeded fuzz harness is cheap to stand up; Odin has no built-in fuzzer (docs/research/odin-ecosystem.md), so this likely means an external driver feeding the parsers via a small CLI. The hostile-input findings from the 2026-08-09 review (all crafted by hand) suggest fuzzing would pay for itself.

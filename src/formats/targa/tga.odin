@@ -18,6 +18,18 @@ Error :: enum {
 // leaves 24-bit images as 3-channel buffers (its alpha_add option is
 // only cosmetic for TGA), so the alpha expansion happens here.
 decode :: proc(data: []u8, allocator := context.allocator) -> (pixels: []u8, width: int, height: int, error: Error) {
+	// Pre-validate dimensions: the core loader accepts zero-dimension
+	// headers and then leaks its Image struct in destroy (review
+	// finding, WI-0008 log; leak is upstream in core:image/tga).
+	if len(data) < 18 {
+		return nil, 0, 0, .Corrupt_Data
+	}
+	header_width := int(data[12]) | int(data[13]) << 8
+	header_height := int(data[14]) | int(data[15]) << 8
+	if header_width == 0 || header_height == 0 {
+		return nil, 0, 0, .Corrupt_Data
+	}
+
 	context.allocator = allocator
 	loaded, load_error := core_tga.load_from_bytes(data)
 	if load_error != nil {

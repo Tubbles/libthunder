@@ -61,3 +61,15 @@ garbage_is_rejected :: proc(t: ^testing.T) {
 	_, _, _, error := decode(junk[:])
 	testing.expect_value(t, error, Error.Corrupt_Data)
 }
+
+@(test)
+zero_dimension_header_is_rejected :: proc(t: ^testing.T) {
+	// Crafted type-2 32-bit header with width == height == 0; the core
+	// loader would accept it and leak its Image struct on destroy.
+	header := [18]u8{}
+	header[2] = 2
+	header[16] = 32
+	header[17] = 8
+	_, _, _, error := decode(header[:])
+	testing.expect_value(t, error, Error.Corrupt_Data)
+}

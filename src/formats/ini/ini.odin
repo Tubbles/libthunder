@@ -43,7 +43,10 @@ parse :: proc(content: string, allocator := context.allocator) -> (file: File) {
 	file.allocator = allocator
 	file.sections = make([dynamic]Section, allocator)
 
-	remaining := content
+	// Third-party tools save TXT files with a UTF-8 BOM, which
+	// trim_space does not strip and which would otherwise hide the
+	// first section header (review finding, WI-0007 log).
+	remaining := strings.trim_prefix(content, "\xef\xbb\xbf")
 	for raw_line in strings.split_lines_iterator(&remaining) {
 		line := strings.trim_space(raw_line)
 		if len(line) == 0 || strings.has_prefix(line, "//") {

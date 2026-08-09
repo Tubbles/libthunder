@@ -70,3 +70,18 @@ cells_before_bounds_are_an_error :: proc(t: ^testing.T) {
 	defer destroy(&table)
 	testing.expect_value(t, error, Error.Missing_Bounds)
 }
+
+@(test)
+hostile_bounds_are_rejected :: proc(t: ^testing.T) {
+	// Passes the per-axis caps but multiplies to ~4e9 cells.
+	table, error := parse("ID;P\nB;X4096;Y1000000\nE\n")
+	defer destroy(&table)
+	testing.expect_value(t, error, Error.Invalid_Bounds)
+}
+
+@(test)
+duplicate_bounds_are_rejected :: proc(t: ^testing.T) {
+	table, error := parse("ID;P\nB;X2;Y2\nC;X1;Y1;K\"kept\"\nB;X2;Y2\nE\n")
+	defer destroy(&table)
+	testing.expect_value(t, error, Error.Invalid_Bounds)
+}

@@ -80,13 +80,12 @@ parse :: proc(content: string, allocator := context.allocator) -> (result: Table
 	}
 
 	remaining := content
-	for raw_line in strings.split_lines_iterator(&remaining) {
-		line := strings.trim_right(raw_line, "\r")
+	for line in strings.split_lines_iterator(&remaining) {
 		if len(line) == 0 {
 			continue
 		}
 
-		split_record_fields(line, &fields, allocator) or_return
+		split_record_fields(line, &fields, allocator)
 		if len(fields) == 0 {
 			continue
 		}
@@ -134,8 +133,18 @@ parse :: proc(content: string, allocator := context.allocator) -> (result: Table
 	return table, .None
 }
 
+// Real corpus tables top out around 838 x 79 cells; the total cap
+// blocks hostile bounds that pass the per-axis caps but multiply into
+// gigabyte allocations (review finding, WI-0007 log).
+MAXIMUM_TOTAL_CELLS :: 16_000_000
+
 @(private)
 parse_bounds :: proc(table: ^Table, fields: []string) -> Error {
+	if table.cells != nil {
+		// WC3 files carry exactly one B record; a second one would
+		// otherwise leak or corrupt the table being built.
+		return .Invalid_Bounds
+	}
 	column_count := 0
 	row_count := 0
 	for field in fields {
@@ -156,9 +165,16 @@ parse_bounds :: proc(table: ^Table, fields: []string) -> Error {
 	if column_count <= 0 || row_count <= 0 || column_count > 4096 || row_count > 1_000_000 {
 		return .Invalid_Bounds
 	}
+	if column_count * row_count > MAXIMUM_TOTAL_CELLS {
+		return .Invalid_Bounds
+	}
+	cells, allocation_error := make([]Cell_Value, column_count * row_count, table.allocator)
+	if allocation_error != nil {
+		return .Invalid_Bounds
+	}
 	table.column_count = column_count
 	table.row_count = row_count
-	table.cells = make([]Cell_Value, column_count * row_count, table.allocator)
+	table.cells = cells
 	return .None
 }
 
@@ -230,7 +246,7 @@ parse_value :: proc(field: string, allocator: runtime.Allocator) -> Cell_Value {
 // Split one record line on ';', honoring the SYLK ";;" escape for a
 // literal semicolon inside a field. Returns cloned field strings.
 @(private)
-split_record_fields :: proc(line: string, fields: ^[dynamic]string, allocator: runtime.Allocator) -> Error {
+split_record_fields :: proc(line: string, fields: ^[dynamic]string, allocator: runtime.Allocator) {
 	builder := strings.builder_make(allocator)
 	defer strings.builder_destroy(&builder)
 
@@ -256,5 +272,4 @@ split_record_fields :: proc(line: string, fields: ^[dynamic]string, allocator: r
 		index += 1
 	}
 	flush(&builder, fields, allocator)
-	return .None
 }

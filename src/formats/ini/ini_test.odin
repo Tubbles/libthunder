@@ -61,6 +61,17 @@ duplicate_keys_last_wins :: proc(t: ^testing.T) {
 }
 
 @(test)
+utf8_bom_does_not_hide_first_section :: proc(t: ^testing.T) {
+	file := parse("\xef\xbb\xbf[First]\nkey=1\n[Second]\nother=2\n")
+	defer destroy(&file)
+
+	testing.expect_value(t, len(file.sections), 2)
+	value, found := lookup(&file, "First", "key")
+	testing.expect(t, found)
+	testing.expect_value(t, value, "1")
+}
+
+@(test)
 stray_lines_are_skipped :: proc(t: ^testing.T) {
 	file := parse("orphan=1\ngarbage line\n[S]\nkey=v\n")
 	defer destroy(&file)
