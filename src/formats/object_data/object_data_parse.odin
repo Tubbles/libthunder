@@ -99,6 +99,14 @@ MODIFICATION_MINIMUM_SIZE_LEVELED :: 21
 // file carries trailing bytes (WI-0011 probe, exact end-of-file on
 // all 61 files), so leftover input is corrupt. On error the partially
 // built structure is freed and a zero value is returned.
+//
+// The format has no in-band shape marker, so a wrong shape argument
+// is not reliably detected: most mismatches error (58 of the 61
+// corpus files parsed with the opposite shape do), but a simple-shape
+// file whose modifications are all strings of 8 or more characters
+// parses as Leveled with the string's first 8 bytes consumed as
+// level/data_pointer (3 corpus files exhibit this). Callers must take
+// the shape from the file's extension, not guess it.
 parse :: proc(data: []u8, shape: Shape, allocator := context.allocator) -> (object_data: Object_Data, error: Error) {
 	building: Object_Data
 	building.allocator = allocator

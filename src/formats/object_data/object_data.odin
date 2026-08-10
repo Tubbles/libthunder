@@ -78,10 +78,10 @@ Modification :: struct {
 	value:        Value,
 	// Trailing int32, stored verbatim. Corpus (61 files): 35628 are
 	// zero, 7734 repeat the entry's old id, 405 hold unrelated
-	// rawcodes (other object ids, next to "umdl"/"uico" string
-	// modifications), so no value can be validated against; the
-	// references agree it is unused (War3Net names it SanityCheck,
-	// wc3lib and the HiveWE wiki an end token).
+	// rawcodes (other object ids, next to "uico"/"umdl"/"usnd"
+	// string modifications: 205/190/10), so no value can be validated
+	// against; the references agree it is unused (War3Net names it
+	// SanityCheck, wc3lib and the HiveWE wiki an end token).
 	end_token:    [4]u8,
 }
 

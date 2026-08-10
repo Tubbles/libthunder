@@ -209,6 +209,48 @@ shape_for_extension_maps_all_seven :: proc(t: ^testing.T) {
 }
 
 @(test)
+wrong_shape_usually_errors :: proc(t: ^testing.T) {
+	// The common mismatch direction: a leveled file parsed as Simple
+	// misreads level bytes as a value and derails into an error. Not
+	// guaranteed by the format (see the parse doc comment), but true
+	// of this fixture and of 58 of the 61 corpus files.
+	file := test_build_file(2, .Leveled)
+	defer delete(file)
+	object_data, error := parse(file[:], .Simple)
+	testing.expect(t, error != .None, "expected the shape mismatch to error")
+	testing.expect_value(t, len(object_data.original), 0)
+}
+
+@(test)
+wrong_shape_realignment_is_not_detected :: proc(t: ^testing.T) {
+	// The format has no in-band shape marker (see the parse doc
+	// comment): a simple-shape file whose modifications are all
+	// strings of 8 or more characters parses as Leveled, silently
+	// consuming each string's first 8 bytes as level/data_pointer.
+	// Three corpus files exhibit this. The test pins the documented
+	// limitation so a change in behavior is noticed.
+	file := make([dynamic]u8)
+	defer delete(file)
+	test_append_i32(&file, 2)
+	test_append_u32(&file, 1)
+	append(&file, "hfoo")
+	test_append_u32(&file, 0)
+	test_append_u32(&file, 1)
+	append(&file, "unam")
+	test_append_i32(&file, i32(Value_Type.String))
+	test_append_string(&file, "TRIGSTR_197")
+	test_append_u32(&file, 0)
+	test_append_u32(&file, 0)
+
+	object_data, error := parse(file[:], .Leveled)
+	defer destroy(&object_data)
+	testing.expect_value(t, error, Error.None)
+	value, is_string := object_data.original[0].modifications[0].value.(string)
+	testing.expect(t, is_string)
+	testing.expect_value(t, value, "197")
+}
+
+@(test)
 unsupported_version_is_rejected :: proc(t: ^testing.T) {
 	file := test_build_file(3, .Simple)
 	defer delete(file)

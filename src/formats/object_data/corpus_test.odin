@@ -307,4 +307,14 @@ corpus_sweep_all_object_data :: proc(t: ^testing.T) {
 	testing.expect_value(t, totals.failed, 0)
 	testing.expect(t, totals.files > 0, "sweep found no object data")
 	testing.expect_value(t, totals.files, totals.version_1 + totals.version_2)
+	// The corpus contents are fixed, so the exact counts are asserted:
+	// a drop here means enumeration or extraction regressed and files
+	// silently left the sweep's coverage, not that the corpus changed.
+	testing.expect_value(t, totals.files, 61)
+	testing.expect_value(t, totals.version_1, 13)
+	testing.expect_value(t, totals.version_2, 48)
+	expected_per_extension := [?]int{15, 13, 7, 7, 9, 7, 3}
+	for expected, extension_index in expected_per_extension {
+		testing.expect_value(t, totals.per_extension[extension_index], expected)
+	}
 }
