@@ -1,6 +1,6 @@
 # WI-0011: object data files (w3u, w3t, w3b, w3d, w3a, w3h, w3q)
 
-Status: backlog
+Status: in progress
 
 ## Goal
 
@@ -26,3 +26,4 @@ scripts/check.sh green in CI; corpus sweep logged here with per-extension parse 
 ## Log
 
 - 2026-08-10: created from the WI-0010 map survey; queued behind WI-0010.
+- 2026-08-10: started after WI-0010 closed. Corpus widened: data/Warcraft III/Campaigns/DemoCampaign.w3n opens directly with our MPQ reader and carries war3campaign.w3u and war3campaign.w3t (same format, campaign-scoped) plus three embedded maps; the campaign files and, if practical, the embedded maps' object data join the sweep alongside the 11 stock maps.
