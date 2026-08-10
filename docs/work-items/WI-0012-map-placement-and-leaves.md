@@ -1,6 +1,6 @@
 # WI-0012: map placement and leaf formats (doo, w3c, w3r, w3s, mmp, imp)
 
-Status: backlog
+Status: in progress
 
 ## Goal
 
@@ -25,3 +25,4 @@ scripts/check.sh green in CI; corpus sweep logged here with per-format parse cou
 ## Log
 
 - 2026-08-10: created from the WI-0010 map survey; queued behind WI-0011.
+- 2026-08-10: started after WI-0011's implementation landed. Per the updated process.md subagent policy, the implementation is split into three small Opus subagent tasks: (1) the doo placement package (both files, both version pairs), (2) w3c + w3r + mmp, (3) w3s + imp. One full-quality independent review covers the whole work item once all three land.
