@@ -12,7 +12,7 @@ MPQ reading first, then the formats in dependency order (BLP, SLK/TXT gameplay d
 
 ## Phase 2: sim core
 
-Deterministic simulation: consistent numerics and RNG, game data model, orders/commands, pathing, combat, JASS execution. The real-engine oracle harnesses (testing-strategy.md layers 3 and 4) grow alongside it.
+Deterministic simulation: consistent numerics and RNG, game data model, orders/commands, pathing, combat, JASS execution. The real-engine oracle harnesses (testing-strategy.md layers 3 and 4) grow alongside it. Broken down in [plan-phase-2.md](plan-phase-2.md): four tracks driven by the headless-skirmish milestone, with numerics decided by research (WI-0013) and the sim built lockstep-ready with netcode deferred (decision 0006).
 
 Headless mode is a named deliverable of this phase, not a byproduct: the sim builds and runs with no rendering, audio, or input dependency, driven entirely through a programmatic order/observation interface. Dedicated servers, CI oracle runs, fast-forward replay verification, and AI experimentation (see Phase 5) all sit on it, and it is cheap to have only if the sim is built that way from day one.
 
