@@ -642,3 +642,18 @@ count_product_cannot_wrap_past_the_check :: proc(t: ^testing.T) {
 	_, error := parse_units(file[:])
 	testing.expect_value(t, error, Error.Invalid_Count)
 }
+
+// The doodad path shares read_count with the unit path, but the wrap
+// guard deserves its own pin: 102261127 entries of 42 bytes is
+// 4294967334, which truncates to 38 in 32 bits.
+@(test)
+doodad_count_product_cannot_wrap_past_the_check :: proc(t: ^testing.T) {
+	file := make([dynamic]u8)
+	defer delete(file)
+	test_append_header(&file, VERSION_REIGN_OF_CHAOS, SUB_VERSION_REIGN_OF_CHAOS, 102261127)
+	for _ in 0 ..< 10 {
+		test_append_i32(&file, 0)
+	}
+	_, error := parse_doodads(file[:])
+	testing.expect_value(t, error, Error.Invalid_Count)
+}

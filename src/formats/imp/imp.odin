@@ -44,7 +44,7 @@ Error :: enum {
 	Truncated,
 	Invalid_Count,
 	Unterminated_String,
-	Trailing_Data,
+	Trailing_Bytes,
 }
 
 SUPPORTED_VERSION :: 1
@@ -184,7 +184,7 @@ parse :: proc(data: []u8, allocator := context.allocator) -> (imported_files: Im
 
 	// Exact end-of-file: all twelve files in the corpus end here.
 	if reader_remaining(&reader) != 0 {
-		return {}, .Trailing_Data
+		return {}, .Trailing_Bytes
 	}
 	return building, .None
 }

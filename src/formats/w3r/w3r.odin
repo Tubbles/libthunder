@@ -48,7 +48,7 @@ Error :: enum {
 	Truncated,
 	Invalid_Count,
 	Unterminated_String,
-	Trailing_Data,
+	Trailing_Bytes,
 }
 
 SUPPORTED_VERSION :: 5
@@ -220,7 +220,7 @@ parse :: proc(data: []u8, allocator := context.allocator) -> (map_regions: Map_R
 
 	// Exact end-of-file; every stock map ends here.
 	if reader_remaining(&reader) != 0 {
-		return {}, .Trailing_Data
+		return {}, .Trailing_Bytes
 	}
 	return building, .None
 }

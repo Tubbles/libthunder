@@ -29,7 +29,7 @@ package w3c
 // bump, so no declared field distinguishes the shapes. This reader is
 // strict classic: it reads ten floats and requires the file to end
 // exactly after the last name. A Reforged-shaped file therefore fails
-// with Trailing_Data or Truncated rather than being mis-read. That
+// with Trailing_Bytes or Truncated rather than being mis-read. That
 // guard is sound but not a proof of impossibility: because each
 // record ends at a NUL, a longer record shape re-synchronises at the
 // next camera, so a hand-built file could in principle land on
@@ -45,7 +45,7 @@ Error :: enum {
 	Truncated,
 	Invalid_Count,
 	Unterminated_String,
-	Trailing_Data,
+	Trailing_Bytes,
 }
 
 SUPPORTED_VERSION :: 0
@@ -203,7 +203,7 @@ parse :: proc(data: []u8, allocator := context.allocator) -> (map_cameras: Map_C
 	// Exact end-of-file. Every stock map ends here, and this is the
 	// guard against the unsignaled Reforged camera shape.
 	if reader_remaining(&reader) != 0 {
-		return {}, .Trailing_Data
+		return {}, .Trailing_Bytes
 	}
 	return building, .None
 }

@@ -211,5 +211,5 @@ trailing_bytes_are_rejected :: proc(t: ^testing.T) {
 	defer delete(file)
 	append(&file, 0)
 	_, error := parse(file[:])
-	testing.expect_value(t, error, Error.Trailing_Data)
+	testing.expect_value(t, error, Error.Trailing_Bytes)
 }

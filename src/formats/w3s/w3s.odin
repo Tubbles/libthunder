@@ -48,7 +48,7 @@ Error :: enum {
 	Truncated,
 	Invalid_Count,
 	Unterminated_String,
-	Trailing_Data,
+	Trailing_Bytes,
 }
 
 SUPPORTED_VERSION :: 1
@@ -230,7 +230,7 @@ parse :: proc(data: []u8, allocator := context.allocator) -> (map_sounds: Map_So
 	// ends here. This is also the guard against a v2/v3 record shape
 	// slipping through with a v1 version field.
 	if reader_remaining(&reader) != 0 {
-		return {}, .Trailing_Data
+		return {}, .Trailing_Bytes
 	}
 	return building, .None
 }

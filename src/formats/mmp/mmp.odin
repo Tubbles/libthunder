@@ -39,7 +39,7 @@ Error :: enum {
 	Unsupported_Version,
 	Truncated,
 	Invalid_Count,
-	Trailing_Data,
+	Trailing_Bytes,
 }
 
 SUPPORTED_VERSION :: 0
@@ -163,7 +163,7 @@ parse :: proc(data: []u8, allocator := context.allocator) -> (preview_icons: Map
 
 	// Exact end-of-file; every stock map ends here.
 	if reader_remaining(&reader) != 0 {
-		return {}, .Trailing_Data
+		return {}, .Trailing_Bytes
 	}
 	return building, .None
 }
