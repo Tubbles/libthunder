@@ -43,11 +43,12 @@ degenerate_dimensions_are_rejected :: proc(t: ^testing.T) {
 	testing.expect_value(t, zero_error, Error.Invalid_Dimensions)
 }
 
-// Dimensions whose tile product wraps 32-bit arithmetic must not pass
-// the length check; the validation runs in i64.
+// Dimensions whose tile product wraps 32-bit arithmetic must never
+// reach the allocation; the u32-width guard rejects them before the
+// i64 length check can even run.
 @(test)
 dimension_product_wrap_is_rejected :: proc(t: ^testing.T) {
 	data: [16]u8
 	_, error := parse(data[:], 0x4000_0002, 2)
-	testing.expect_value(t, error, Error.Length_Mismatch)
+	testing.expect_value(t, error, Error.Invalid_Dimensions)
 }

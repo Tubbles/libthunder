@@ -137,6 +137,30 @@ tilepoint_count_mismatch_is_rejected :: proc(t: ^testing.T) {
 }
 
 @(test)
+dimension_product_wrap_is_rejected :: proc(t: ^testing.T) {
+	// 0x8000_0001 * 2 * 7 wraps to 14 in 32-bit int arithmetic, which
+	// would match the 14 record bytes below; the i64 validation must
+	// reject it on every target.
+	file := make([dynamic]u8)
+	defer delete(file)
+	append(&file, "W3E!")
+	test_append_u32(&file, 11)
+	append(&file, 'L')
+	test_append_u32(&file, 0)
+	test_append_u32(&file, 0)
+	test_append_u32(&file, 0)
+	test_append_u32(&file, 0x8000_0001)
+	test_append_u32(&file, 2)
+	test_append_f32(&file, 0)
+	test_append_f32(&file, 0)
+	for _ in 0 ..< 14 {
+		append(&file, 0)
+	}
+	_, error := parse(file[:])
+	testing.expect_value(t, error, Error.Invalid_Dimensions)
+}
+
+@(test)
 zero_dimension_is_rejected :: proc(t: ^testing.T) {
 	file := make([dynamic]u8)
 	defer delete(file)

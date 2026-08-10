@@ -90,6 +90,18 @@ cell_count_mismatch_is_rejected :: proc(t: ^testing.T) {
 // the remaining byte count (0x80000004 * 2 wraps to 8) must not pass
 // the size check; the validation runs in i64.
 @(test)
+zero_dimension_is_rejected :: proc(t: ^testing.T) {
+	file := make([dynamic]u8)
+	defer delete(file)
+	append(&file, "MP3W")
+	test_append_u32(&file, 0)
+	test_append_u32(&file, 0)
+	test_append_u32(&file, 7)
+	_, error := parse(file[:])
+	testing.expect_value(t, error, Error.Invalid_Dimensions)
+}
+
+@(test)
 dimension_product_wrap_is_rejected :: proc(t: ^testing.T) {
 	file := make([dynamic]u8)
 	defer delete(file)

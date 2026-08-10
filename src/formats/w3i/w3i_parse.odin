@@ -71,12 +71,15 @@ read_string :: proc(reader: ^Reader, allocator: runtime.Allocator) -> (text: str
 // Reads a list count and validates it against the remaining bytes at
 // the given minimum bytes per element, before the caller allocates.
 @(private)
-read_count :: proc(reader: ^Reader, minimum_element_size: int) -> (count: int, error: Error) {
+// The element size is i64 so callers can pass computed sizes (for
+// example 4 + 4 * column_count) without the expression itself being
+// able to wrap on a 32-bit int target.
+read_count :: proc(reader: ^Reader, minimum_element_size: i64) -> (count: int, error: Error) {
 	raw, ok := read_u32(reader)
 	if !ok {
 		return 0, .Truncated
 	}
-	if i64(raw) * i64(minimum_element_size) > i64(reader_remaining(reader)) {
+	if i64(raw) * minimum_element_size > i64(reader_remaining(reader)) {
 		return 0, .Invalid_Count
 	}
 	return int(raw), .None
@@ -355,7 +358,7 @@ parse_random_unit_tables :: proc(reader: ^Reader, info: ^Map_Info, allocator: ru
 		}
 
 		// Each line is a chance plus one id per column.
-		line_count := read_count(reader, 4 + 4 * column_count) or_return
+		line_count := read_count(reader, 4 + 4 * i64(column_count)) or_return
 		table.lines = make([]Random_Unit_Line, line_count, allocator)
 		for &line in table.lines {
 			chance, chance_ok := read_i32(reader)

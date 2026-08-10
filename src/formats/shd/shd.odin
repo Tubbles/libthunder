@@ -77,6 +77,13 @@ parse :: proc(
 	}
 	tile_columns := i64(environment_width) - 1
 	tile_rows := i64(environment_height) - 1
+	// The u32 casts below must not truncate on dimensions this large;
+	// no real input reaches this (the length check would demand a
+	// >= 16 GiB file), but the guard keeps the arithmetic provably
+	// exact on every target.
+	if 4 * tile_columns > i64(max(u32)) || 4 * tile_rows > i64(max(u32)) {
+		return {}, .Invalid_Dimensions
+	}
 	if SAMPLES_PER_TILE * tile_columns * tile_rows != i64(len(data)) {
 		return {}, .Length_Mismatch
 	}

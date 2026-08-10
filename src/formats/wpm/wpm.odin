@@ -96,6 +96,9 @@ parse :: proc(data: []u8, allocator := context.allocator) -> (pathing_map: Pathi
 	}
 	width := read_u32(data, 8)
 	height := read_u32(data, 12)
+	if width == 0 || height == 0 {
+		return {}, .Invalid_Dimensions
+	}
 
 	// The corpus stores exactly width * height cell bytes and nothing
 	// after them (all 186 stock maps, WI-0010). Product in i64 so a

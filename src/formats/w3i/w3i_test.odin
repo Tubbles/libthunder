@@ -288,6 +288,19 @@ all_truncations_error_cleanly :: proc(t: ^testing.T) {
 	}
 }
 
+@(test)
+all_v18_truncations_error_cleanly :: proc(t: ^testing.T) {
+	file := test_build_v18_file()
+	defer delete(file)
+	for length in 4 ..< len(file) {
+		info, error := parse(file[:length])
+		if error == .None {
+			testing.expect_value(t, len(info.techs), 0)
+			destroy(&info)
+		}
+	}
+}
+
 // A name string running to the end of the buffer without a NUL.
 @(test)
 unterminated_string_is_rejected :: proc(t: ^testing.T) {
