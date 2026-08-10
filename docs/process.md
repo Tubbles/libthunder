@@ -20,6 +20,9 @@ How work gets done in this project. The project owner sets direction and answers
 
 - Research and mechanical work is delegated to subagents to conserve context. Prompts must state the deliverable format and the grounding requirements.
 - Subagents never commit. The main line reviews and commits.
+- Work packages handed to a subagent are kept small and sharply defined: one format, one package, one bounded fix list. Two reasons, both learned 2026-08-10 when a large WI-0011 implementation agent was cut off mid-task by a session usage limit: a small package finishes comfortably inside a session limit, and a small well-defined task is one a cheaper model can carry. Split a work item into several sequential agent tasks rather than one large agent.
+- Implementation and mechanical subagents run on Opus by default, not the main-line model. The main line writes the task definition at full quality; the subagent executes it; the independent review that gates every work item stays at full quality (per Quality gates above), so nothing lands on the cheaper model's judgment alone.
+- A subagent cut off mid-task (session limit, crash) is revived by sending it a continuation message so it resumes from its own transcript; it should re-check on-disk state first, since a file can be half-written at the cutoff moment. Don't restart the task from scratch.
 
 ## Documentation conventions
 
