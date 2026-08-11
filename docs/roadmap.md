@@ -32,6 +32,8 @@ The grievance list: input delay, maximum unit count, data type inconsistencies, 
 
 LLM-powered game AI scripts: a language model drives a player through the same programmatic order/observation interface that Phase 2's headless mode exposes, as an alternative to the classic JASS AI scripts. Headless mode is the enabler; this item is the extension-phase payoff.
 
+The experimentation, however, does not wait for Phase 5 (owner goal, added 2026-08-11): a harness that lets an LLM (for example `claude -p`) play in real time, with its own system prompt, is ticketed as WI-0019 and can start as soon as Track C mechanics make orders meaningful. Real-time is the point: the sim ticks at game speed while the model issues orders at its own latency, like a player with slow APM, rather than the sim turn-waiting on the model. Combined with the spectator stream (WI-0018), watching an LLM play from a phone is the intended demo.
+
 ## Phase 6: asset independence
 
 Replacement assets; the game stands alone.
