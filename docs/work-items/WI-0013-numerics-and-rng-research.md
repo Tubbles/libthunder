@@ -25,3 +25,4 @@ Grounding review per process.md (claims carry sources; license of every consulte
 ## Log
 
 - 2026-08-10: created from the Phase 2 breakdown (docs/plan-phase-2.md, Track A).
+- 2026-08-11: all three research slices returned (engine community research, Odin float-determinism probes, open-realm study; raw findings in work/wi0013-r1/r2/r3-*.md). Owner accepted the f32-plus-discipline recommendation, conditioned on mechanical enforcement; decision 0007 records the policy with the enforcement layers binding. Remaining for closure: the synthesized research doc under docs/research/ and its grounding review.
