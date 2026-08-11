@@ -29,3 +29,4 @@ Runbook exercised end to end on this machine; results logged here.
 
 - 2026-08-10: created from the Phase 2 breakdown (docs/plan-phase-2.md, Track D).
 - 2026-08-11: started. The machine carries a full 1.29.2 installation in data/ (game and World Editor executables) and Xvfb, but no Wine; the empirical channel work is blocked until Wine is installed (needs sudo, owner's call). The oracle-map authoring waits for WI-0013's RNG experiment spec anyway, so the ordering is natural.
+- 2026-08-11: Wine 9.0 (64-bit) installed by the owner, but the 1.29.2 executables are 32-bit PE (checked directly), so wine32:i386 is additionally required; still blocked on that sudo install.

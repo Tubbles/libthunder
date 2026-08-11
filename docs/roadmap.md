@@ -16,6 +16,8 @@ Deterministic simulation: consistent numerics and RNG, game data model, orders/c
 
 Headless mode is a named deliverable of this phase, not a byproduct: the sim builds and runs with no rendering, audio, or input dependency, driven entirely through a programmatic order/observation interface. Dedicated servers, CI oracle runs, fast-forward replay verification, and AI experimentation (see Phase 5) all sit on it, and it is cheap to have only if the sim is built that way from day one.
 
+Spectator stream (owner goal, added 2026-08-11): a stateless, join-anytime video stream of a running headless game, watchable from a phone browser: for following progress, watching integration-test runs live, and demos. It rides the observation side of the headless API as a read-only consumer, starts as a lightweight server-rendered 2D view long before Phase 3's real renderer, and upgrades to the real renderer's output once that exists. Ticketed as WI-0018.
+
 ## Phase 3: presentation
 
 Rendering (terrain, models, UI), audio, input. Backend per decision 0005: SDL3 for windowing/input/audio, OpenGL first behind a backend-agnostic renderer interface, vendor:wgpu as the later portability target.
