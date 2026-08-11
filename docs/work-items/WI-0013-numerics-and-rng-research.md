@@ -1,6 +1,6 @@
 # WI-0013: numerics and RNG research
 
-Status: backlog
+Status: in progress
 
 ## Goal
 

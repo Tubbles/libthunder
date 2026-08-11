@@ -1,6 +1,6 @@
 # WI-0015: gameplay data assembly
 
-Status: backlog
+Status: in progress
 
 ## Goal
 
