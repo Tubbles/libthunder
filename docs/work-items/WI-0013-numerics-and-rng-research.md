@@ -1,6 +1,6 @@
 # WI-0013: numerics and RNG research
 
-Status: in progress
+Status: done
 
 ## Goal
 
@@ -26,3 +26,4 @@ Grounding review per process.md (claims carry sources; license of every consulte
 
 - 2026-08-10: created from the Phase 2 breakdown (docs/plan-phase-2.md, Track A).
 - 2026-08-11: all three research slices returned (engine community research, Odin float-determinism probes, open-realm study; raw findings in work/wi0013-r1/r2/r3-*.md). Owner accepted the f32-plus-discipline recommendation, conditioned on mechanical enforcement; decision 0007 records the policy with the enforcement layers binding. Remaining for closure: the synthesized research doc under docs/research/ and its grounding review.
+- 2026-08-11: research doc synthesized (docs/research/numerics-and-rng.md) and grounding-reviewed: PASS with three corrections, all applied. The reviewer fetched 26 sampled claims live (25 verified, 1 misattribution corrected: the 128-units-per-tile figure was wrongly credited to file-formats.md and is now marked unverified), re-ran the chain-hash probe bit-exact, confirmed clean-room integrity (the synthesis had itself removed a leak the raw notes carried), and resolved the GetRandomReal vector inconsistency by re-reading the upstream README: the pairs are consecutive draws, giving us nine usable oracle vectors under seed 12345. The over-scoped "measured across ARM64/wasm" wording was corrected in both the doc and decision 0007's context (execution-measured on x86-64; object-code-confirmed elsewhere; executing on real ARM64/wasm remains an open item). The RNG question is converted into oracle experiments O-1 through O-10 for WI-0017, O-4 (draw-count alignment) ranked first. Status to done.
