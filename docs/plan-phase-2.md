@@ -29,7 +29,7 @@ The milestone is reached when C5 lands: a melee map loads and two programmatical
 ## Track D: parity harness, in parallel
 
 - **WI-0017 (ticketed): layer-3 oracle validation.** Confirm the Preload export channel on real 1.29b, build the first instrumented oracle maps, and establish the diff pipeline. Unblocks A3 and all Track C parity claims.
-- D2 (unticketed): .w3g replay format reader and the layer-4 harness skeleton; becomes urgent once Track C nears the milestone.
+- D2 (unticketed): .w3g replay format reader and the layer-4 harness skeleton; becomes urgent once Track C nears the milestone. The WI-0013 research already banked replay-format facts for it (community spec: header CRC32, the 128-byte SIGN block, per-turn 0x22 checksum blocks, commands as f32 coordinates); the D2 ticket should start from docs/research/numerics-and-rng.md's sources rather than re-surveying.
 - D3 (unticketed): the JASS track — lexer/parser for common.j/Blizzard.j/war3map.j, interpreter, natives on demand, trigger/event glue. Its own mini-phase after the milestone, sized per the process.md subagent policy.
 
 ## Standing constraints
