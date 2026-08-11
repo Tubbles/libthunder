@@ -14,8 +14,17 @@ package object_data
 //   modification id, a value-type tag, the value, and an end token.
 // - Leveled (w3a, w3q, w3d): two extra int32 fields between the tag
 //   and the value: a level (a variation index for w3d) and a data
-//   pointer selecting the SLK data column (corpus range 0..6,
-//   mapping A, B, C, D, F, G, H, skipping E, per the HiveWE wiki).
+//   pointer selecting the SLK data column. The pointer counts the
+//   letters from 1 with nothing skipped: 1 is DataA through 9 is
+//   DataI, and the corpus range 0..6 therefore reaches DataF. (An
+//   earlier note here repeated the HiveWE wiki's claim that E is
+//   skipped. It is not: metadata row fbk5 has data=5 for ability
+//   Afbt, whose DataE1 is the 20 its stock tooltip quotes, and 157
+//   corpus modifications use pointer 5. WI-0015 survey, section 2.)
+//   The pointer is redundant with the metadata anyway: it equals the
+//   metadata row's `data` value on every corpus modification, so
+//   thunder:gamedata reads the column from the metadata and uses the
+//   pointer only as a cross-check.
 //
 // Supported versions, corpus-driven (WI-0011 probe over all 186
 // stock maps plus DemoCampaign.w3n and its three embedded maps): v1
